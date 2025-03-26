@@ -1,0 +1,3 @@
+[submodule "wechat-ocr"]
+	path = wechat-ocr
+	url = https://github.com/swigger/wechat-ocr

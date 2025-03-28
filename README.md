@@ -21,6 +21,13 @@ A containerized WeChat OCR API service with multi-architecture support (x86_64 a
 - Git && LFS (for cloning the repository)
 - Internet connection for pulling Docker images
 
+## Quick Start
+
+```bash
+pdm run start ## build and run the container locally
+```
+```
+
 ## 🛠️ Installation
 
 1. **Clone the Repository**
@@ -60,6 +67,15 @@ A containerized WeChat OCR API service with multi-architecture support (x86_64 a
      -H "Content-Type: application/json" \
      -d @data.json \
      http://localhost:5000/ocr
+
+    # Create a test request with a URL
+    echo '{"url": "https://example.com/test_image.jpg"}' > data.json
+
+    # Send the request
+    curl -X POST \
+      -H "Content-Type: application/json" \
+      -d @data.json \
+      http://localhost:5000/ocr
    ```
 
 ## 🙏 Credits

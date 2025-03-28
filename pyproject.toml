@@ -1,0 +1,58 @@
+[project]
+name = "wxocr"
+version = "0.1.0"
+description = "WeChat OCR Service"
+authors = [
+    {name = "yuchanns", email = "airamusume@gmail.com"}
+]
+dependencies = [
+    "flask>=2.0.0",
+    "requests>=2.31.0",
+    "twisted>=22.10.0",
+    "werkzeug>=2.0.0",
+    "python-dotenv>=1.0.0",  # for environment variable management
+]
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.0.0",         # code formatting
+    "isort>=5.12.0",        # import sorting
+    "flake8>=6.1.0",        # code linting
+    "mypy>=1.5.0",          # type checking
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+package-dir = "."
+
+[tool.pdm.scripts]
+start = "python scripts/docker_ops.py"
+
+[tool.pdm.dev-dependencies]
+test = [
+    "pytest>=7.0.0",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py38"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+reportMissingModuleSource = false

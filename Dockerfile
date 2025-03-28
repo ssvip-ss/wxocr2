@@ -43,6 +43,21 @@ COPY ./wx.tar.gz /tmp/wx.tar.gz
 
 RUN tar -zxvf /tmp/wx.tar.gz -C /
 
+# Add PDM stage for dependency management
+FROM python:3.9-slim AS pdm
+
+WORKDIR /app
+
+# Install PDM
+RUN pip install -U pip setuptools wheel && \
+    pip install pdm
+
+# Copy project files for dependency installation
+COPY pyproject.toml pdm.lock ./
+
+# Install production dependencies only
+RUN pdm install --prod --no-lock --no-editable
+
 FROM python:3.9-slim
 
 ARG TARGETARCH
@@ -51,7 +66,7 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install flask
+WORKDIR /app
 
 # Copy architecture-specific files
 COPY --from=extractor /wx/${TARGETARCH}/opt /app/wx/opt
@@ -59,8 +74,19 @@ COPY --from=extractor /wx/${TARGETARCH}/opt /app/wx/opt
 # Copy architecture-specific .so files
 COPY --from=builder /build/build/wcocr.cpython-*-linux-gnu.so /app/
 
+# Copy dependencies from pdm stage
+COPY --from=pdm /app/.venv /app/.venv
+
+# Copy source code
 COPY main.py /app/main.py
 
-WORKDIR /app
+# Set Python environment
+ENV PYTHONPATH=/app/.venv/lib/python3.9/site-packages
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
+ENV WXOCR_BASE_PATH=/app/wx/opt/wechat/wxocr
+ENV WECHAT_PATH=/app/wx/opt/wechat
+
+EXPOSE 5000
 
 CMD ["python", "main.py"]

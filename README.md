@@ -2,8 +2,8 @@
 
 [![Platform](https://img.shields.io/badge/platform-linux%2Famd64%20%7C%20linux%2Farm64-blue)](https://github.com/yuchanns/wxocr)
 [![Python](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/)
-[![Image](https://ghcr-badge.egpl.dev/yuchanns/wxocr/tags?trim=major)](https://github.com/yuchanns/wxocr/pkgs/container/wxocr)
-![Size](https://ghcr-badge.egpl.dev/yuchanns/wxocr/size)
+[![Image](https://ghcr-badge.yuchanns.xyz/yuchanns/wxocr/tags?ignore=latest)](https://github.com/yuchanns/wxocr/pkgs/container/wxocr)
+![Size](https://ghcr-badge.yuchanns.xyz/yuchanns/wxocr/size)
 
 A containerized WeChat OCR API service with multi-architecture support (x86_64 and ARM64). This project is forked from [hx71105417/wxocr](https://github.com/hx71105417/wxocr) with additional improvements for modern environments.
 
@@ -25,7 +25,6 @@ A containerized WeChat OCR API service with multi-architecture support (x86_64 a
 
 ```bash
 pdm run start ## build and run the container locally
-```
 ```
 
 ## 🛠️ Installation

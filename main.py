@@ -75,11 +75,29 @@ def download_image(url: str) -> Optional[bytes]:
 
 @app.route('/health')
 def health_check() -> Response:
-    return Response(
-        response=jsonify({'status': 'healthy', 'timestamp': datetime.now(timezone.utc).isoformat()}).get_data(as_text=True),
-        status=200,
-        mimetype='application/json'
-    )
+    return jsonify({'status': 'healthy', 'timestamp': datetime.now(timezone.utc).isoformat()})
+
+
+# Custom exceptions
+class OCRException(Exception):
+    def __init__(self, message: str, status_code: int = 400):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+@app.errorhandler(OCRException)
+def handle_ocr_exception(error: OCRException) -> Response:
+    response = jsonify({'error': str(error)})
+    response.status_code = error.status_code
+    return response
+
+
+@app.errorhandler(Exception)
+def handle_exception(error: Exception) -> Response:
+    logger.error(f"Error processing request: {error}")
+    response = jsonify({'error': 'Internal server error'})
+    response.status_code = 500
+    return response
 
 
 @app.route('/ocr', methods=['POST'])
@@ -88,61 +106,42 @@ def ocr() -> Response:
     Request body format: {"image": "base64 encoded image data"} or {"url": "image URL"}
     """
     if not request.is_json:
-        res = jsonify({'error': 'Content-Type must be application/json'})
-        res.status_code = 400
-        return res
+        raise OCRException('Content-Type must be application/json')
 
     data = request.get_json()
     if data is None:
-        res = jsonify({'error': 'Invalid JSON data'})
-        res.status_code = 400
-        return res
+        raise OCRException('Invalid JSON data')
 
     image_data = data.get('image')
     image_url = data.get('url')
 
     # Validate request parameters
     if (not image_data and not image_url) or (image_data and image_url):
-        res = jsonify({'error': 'Must provide either image data or URL, not both'})
-        res.status_code = 400
-        return res
+        raise OCRException('Must provide either image data or URL, not both')
 
-    try:
-        # Prepare image data
-        if image_url:
-            if not is_valid_url(image_url):
-                res = jsonify({'error': 'Invalid URL format'})
-                res.status_code = 400
-                return res
-            image_bytes = download_image(image_url)
-            if not image_bytes:
-                res = jsonify({'error': 'Failed to download image'})
-                res.status_code = 400
-                return res
-        else:
-            if not validate_base64(image_data):
-                res = jsonify({'error': 'Invalid base64 image data'})
-                res.status_code = 400
-                return res
-            image_bytes = base64.b64decode(image_data)
+    # Prepare image data
+    if image_url:
+        if not is_valid_url(image_url):
+            raise OCRException('Invalid URL format')
+        image_bytes = download_image(image_url)
+        if not image_bytes:
+            raise OCRException('Failed to download image')
+    else:
+        if not validate_base64(image_data):
+            raise OCRException('Invalid base64 image data')
+        image_bytes = base64.b64decode(image_data)
 
-        # Process image
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=True) as temp:
-            temp.write(image_bytes)
-            temp.flush()
+    # Process image
+    with tempfile.NamedTemporaryFile(suffix='.png', delete=True) as temp:
+        temp.write(image_bytes)
+        temp.flush()
 
-            start_time = datetime.now()
-            result = wcocr.ocr(temp.name)
-            processing_time = (datetime.now() - start_time).total_seconds()
+        start_time = datetime.now()
+        result = wcocr.ocr(temp.name)
+        processing_time = (datetime.now() - start_time).total_seconds()
 
-            logger.info(f"OCR completed in {processing_time:.2f}s")
-            return jsonify(result)
-
-    except Exception as e:
-        logger.error(f"Error processing request: {e}")
-        res = jsonify({'error': 'Internal server error'})
-        res.status_code = 500
-        return res
+        logger.info(f"OCR completed in {processing_time:.2f}s")
+        return jsonify(result)
 
 
 if __name__ == '__main__':

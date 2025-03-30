@@ -79,6 +79,7 @@ COPY --from=pdm /app/.venv /app/.venv
 
 # Copy source code
 COPY main.py /app/main.py
+COPY index.html /app/index.html
 
 # Set Python environment
 ENV PYTHONPATH=/app/.venv/lib/python3.9/site-packages

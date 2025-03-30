@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Image Recognition</title>
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.6/dist/ext/json-enc.js"></script>
+    <style>
+      :root {
+        --primary-color: #07C160;
+        --secondary-color: #95ec95;
+        --background-color: #EDEDED;
+        --box-shadow: 0 8px 20px rgba(7, 193, 96, 0.15);
+        --border-radius: 4px;
+        --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      }
+
+      body {
+        font-family: var(--font-family);
+        background-color: var(--background-color);
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        color: #333;
+      }
+
+      .container {
+        width: 90%;
+        max-width: 700px;
+        padding: 30px;
+        background-color: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        transition: all 0.3s ease;
+      }
+
+      h1 {
+        text-align: center;
+        color: var(--primary-color);
+        margin-bottom: 30px;
+        font-weight: 600;
+      }
+
+      .upload-area {
+        border: 2px dashed var(--secondary-color);
+        border-radius: var(--border-radius);
+        padding: 40px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-bottom: 25px;
+        position: relative;
+        background-color: rgba(7, 193, 96, 0.05);
+      }
+
+      .upload-area:hover {
+        border-color: var(--primary-color);
+        background-color: rgba(7, 193, 96, 0.1);
+      }
+
+      .upload-area.active {
+        border-color: var(--primary-color);
+        background-color: rgba(7, 193, 96, 0.15);
+      }
+
+      .upload-icon {
+        font-size: 50px;
+        color: var(--secondary-color);
+        margin-bottom: 15px;
+      }
+
+      .upload-text {
+        color: #666;
+        margin-bottom: 10px;
+      }
+
+      .upload-hint {
+        font-size: 14px;
+        color: #9A9A9A;
+      }
+
+      #fileInput {
+        display: none;
+      }
+
+      .preview-container {
+        margin-top: 20px;
+        text-align: center;
+        display: none;
+      }
+
+      .preview-wrapper {
+        position: relative;
+        display: inline-block;
+        max-width: 100%;
+      }
+
+      #canvasPreview {
+        max-width: 100%;
+        height: auto;
+        display: block;
+      }
+
+      .text-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      .selectable-text {
+        position: absolute;
+        background: transparent;
+        cursor: text;
+        user-select: text;
+        color: transparent;
+        pointer-events: auto;
+        font-weight: bold;
+        letter-spacing: normal;
+        text-rendering: geometricPrecision;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        margin: 20px 0;
+      }
+
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(7, 193, 96, 0.3);
+        border-radius: 50%;
+        border-top-color: var(--primary-color);
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      .error-message {
+        color: #FA5151;
+        text-align: center;
+        margin-top: 15px;
+        display: none;
+      }
+
+      .btn {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: var(--border-radius);
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: inline-block;
+        margin-top: 15px;
+      }
+
+      .btn:hover {
+        background-color: #06AE56;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(7, 193, 96, 0.3);
+      }
+
+      .btn:active {
+        transform: translateY(0);
+      }
+
+      footer {
+        text-align: center;
+        margin-top: 40px;
+        color: #9A9A9A;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>OCR Image Recognition</h1>
+      
+      <div id="uploadArea" class="upload-area">
+        <div class="upload-icon">📷</div>
+        <div class="upload-text">Click or drag image here</div>
+        <div class="upload-hint">Supports JPG, PNG formats</div>
+        <input type="file" id="fileInput" accept="image/*">
+      </div>
+      
+      <div class="preview-container" id="previewContainer">
+        <div class="preview-wrapper">
+          <div class="text-overlay" id="textOverlay"></div>
+          <canvas id="canvasPreview"></canvas>
+        </div>
+        <button class="btn" 
+                id="recognizeBtn"
+                hx-post="/ocr"
+                hx-trigger="click"
+                hx-target="#textOverlay"
+                hx-indicator="#loading"
+                hx-ext="json-enc">Start Recognition</button>
+      </div>
+      
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Processing, please wait...</p>
+      </div>
+      
+      <div class="error-message" id="errorMessage"></div>
+      
+      <footer>
+        <p>OCR Image Recognition · Quick Text Extraction from Images</p>
+      </footer>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const canvasPreview = document.getElementById('canvasPreview');
+        const ctx = canvasPreview.getContext('2d');
+        const recognizeBtn = document.getElementById('recognizeBtn');
+        let originalImage = new Image();
+        
+        uploadArea.addEventListener('click', () => {
+          fileInput.click();
+        });
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+          uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+          uploadArea.addEventListener(eventName, () => {
+            uploadArea.classList.add('active');
+          });
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+          uploadArea.addEventListener(eventName, () => {
+            uploadArea.classList.remove('active');
+          });
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+          const dt = e.dataTransfer;
+          const files = dt.files;
+          
+          if (files.length > 0) {
+            handleFile(files[0]);
+          }
+        });
+        
+        fileInput.addEventListener('change', () => {
+          if (fileInput.files.length > 0) {
+            handleFile(fileInput.files[0]);
+          }
+        });
+
+        function handleFile(file) {
+          if (!file.type.match('image.*')) {
+            showError('Please upload an image file (JPG, PNG)');
+            return;
+          }
+          
+          const reader = new FileReader();
+          
+          reader.onload = (e) => {
+            originalImage.onload = function() {
+              canvasPreview.width = originalImage.width;
+              canvasPreview.height = originalImage.height;
+              ctx.drawImage(originalImage, 0, 0);
+              
+              const textOverlay = document.getElementById('textOverlay');
+              textOverlay.style.width = '100%';
+              textOverlay.style.height = '100%';
+              textOverlay.innerHTML = '';
+              
+              previewContainer.style.display = 'block';
+              hideError();
+            }
+            originalImage.src = e.target.result;
+          };
+          
+          reader.readAsDataURL(file);
+        }
+
+        recognizeBtn.addEventListener('htmx:configRequest', (event) => {
+          const base64Image = canvasPreview.toDataURL().split(',')[1];
+          event.detail.parameters = { image: base64Image };
+        });
+
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+          if(evt.detail.target.id === 'textOverlay') {
+            const response = JSON.parse(evt.detail.xhr.response);
+            if(response.ocr_response && response.ocr_response.length > 0) {
+              drawTextOnImage(response.ocr_response);
+              hideError();
+            } else {
+              showError('No text detected');
+            }
+          }
+        });
+
+        function drawTextOnImage(ocrResults) {
+          const textOverlay = document.getElementById('textOverlay');
+          textOverlay.innerHTML = '';
+
+          ctx.clearRect(0, 0, canvasPreview.width, canvasPreview.height);
+          ctx.drawImage(originalImage, 0, 0);
+
+          const scale = canvasPreview.width / originalImage.width;
+
+          ocrResults.forEach(result => {
+            const text = result.text;
+            const x = result.left * scale;
+            const y = result.top * scale;
+            const width = (result.right - result.left) * scale;
+            const height = (result.bottom - result.top) * scale;
+
+            const fontSize = calculateFontSize(width, height, text);
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillRect(x, y, width, height);
+
+            ctx.font = `${fontSize}px sans-serif`;
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = fontSize / 8;
+            ctx.strokeText(text, x, y + fontSize);
+            ctx.fillStyle = 'red';
+            ctx.fillText(text, x, y + fontSize);
+
+            const textElement = document.createElement('div');
+            textElement.className = 'selectable-text';
+            textElement.textContent = text;
+            
+            textElement.style.cssText = `
+              left: ${x}px;
+              top: ${y}px;
+              width: ${width}px;
+              height: ${height}px;
+              font-size: ${fontSize}px;
+              line-height: ${height}px;
+              text-align: left;
+              padding: 0;
+              display: flex;
+              align-items: center;
+              justify-content: ${text.length > 1 ? 'center' : 'flex-start'};
+              white-space: nowrap;
+              overflow: hidden;
+            `;
+            textOverlay.appendChild(textElement);
+          });
+        }
+
+        function calculateFontSize(width, height, text) {
+          const boxRatio = width / height;
+          let fontSize;
+          
+          if (boxRatio > 2) {
+            fontSize = height * 0.8;
+          } else {
+            fontSize = (width / text.length) * 1.2;
+          }
+          
+          fontSize = Math.min(Math.max(fontSize, 12), height);
+          return Math.floor(fontSize);
+        }
+
+        function showError(message) {
+          const errorMessage = document.getElementById('errorMessage');
+          errorMessage.textContent = message;
+          errorMessage.style.display = 'block';
+        }
+        
+        function hideError() {
+          document.getElementById('errorMessage').style.display = 'none';
+        }
+      });
+    </script>
+  </body>
+</html>

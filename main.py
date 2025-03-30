@@ -144,6 +144,32 @@ def ocr() -> Response:
         return jsonify(result)
 
 
+try:
+    with open("index.html", "r") as f:
+        index_html = f.read()
+except Exception as e:
+    index_html = f"Error reading index.html: {e}"
+
+
+@app.route('/favicon.ico')
+def favicon() -> Response:
+    svg = '''<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32" height="32" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="16" cy="16" r="16" fill="#07C160"/>
+    <text x="16" y="22" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
+          text-anchor="middle" fill="white">
+        OCR
+    </text>
+</svg>'''
+
+    return Response(svg, mimetype='image/svg+xml')
+
+
+@app.route('/')
+def index() -> Response:
+    return Response(index_html, mimetype='text/html')
+
+
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     typed_reactor = cast(ReactorBase, reactor)

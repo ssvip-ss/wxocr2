@@ -1,7 +1,7 @@
 # WeChat OCR API Docker
 
 [![Platform](https://img.shields.io/badge/platform-linux%2Famd64%20%7C%20linux%2Farm64-blue)](https://github.com/yuchanns/wxocr)
-[![Python](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/)
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-390/)
 [![Image](https://ghcr-badge.yuchanns.xyz/yuchanns/wxocr/tags?ignore=latest)](https://github.com/yuchanns/wxocr/pkgs/container/wxocr)
 ![Size](https://ghcr-badge.yuchanns.xyz/yuchanns/wxocr/size)
 
@@ -16,7 +16,7 @@ width="600"/>
 ## 🚀 Features
 
 - Multi-architecture support (AMD64 and ARM64)
-- Python 3.9 compatibility
+- Python 3.12 compatibility
 - Docker container ready
 - Simple REST API interface
 - Easy deployment
@@ -53,14 +53,14 @@ pdm run start ## build and run the container locally
 
    # Build and push the image (replace the tag as needed)
    docker buildx build --platform linux/amd64,linux/arm64 \
-     -t ghcr.io/yuchanns/wxocr:duo-3.9 --push .
+     -t ghcr.io/yuchanns/wxocr:duo-3.12 --push .
    ```
 
 ## 🚀 Usage
 
 1. **Start the Container**
    ```bash
-   docker run -d -p 5000:5000 ghcr.io/yuchanns/wxocr:duo-3.9
+   docker run -d -p 5000:5000 ghcr.io/yuchanns/wxocr:duo-3.12
    ```
 
 2. **Test the API**

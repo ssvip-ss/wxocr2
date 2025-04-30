@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -10,7 +10,7 @@ RUN apt update && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt install -y build-essential cmake make && \
     apt install -y gcc-10 g++-10 git && \
-    apt install -y python3.9 python3.9-dev
+    apt install -y python3.12 python3.12-dev
 
 # Set GCC 10 as default
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100 && \
@@ -31,20 +31,20 @@ RUN mkdir build && \
       export LIB_ARCH="x86_64"; \
     fi && \
     cmake .. \
-      -DPython_EXECUTABLE=/usr/bin/python3.9 \
+      -DPython_EXECUTABLE=/usr/bin/python3.12 \
       -DPython_ROOT=/usr \
-      -DPython_INCLUDE_DIR=/usr/include/python3.9 \
-      -DPython_LIBRARY=/usr/lib/${LIB_ARCH}-linux-gnu/libpython3.9.so && \
+      -DPython_INCLUDE_DIR=/usr/include/python3.12 \
+      -DPython_LIBRARY=/usr/lib/${LIB_ARCH}-linux-gnu/libpython3.12.so && \
     make pywcocr -j$(nproc)
 
-FROM ubuntu:22.04 AS extractor
+FROM ubuntu:24.04 AS extractor
 
 COPY ./wx.tar.gz /tmp/wx.tar.gz
 
 RUN tar -zxvf /tmp/wx.tar.gz -C /
 
 # Add PDM stage for dependency management
-FROM python:3.9-slim AS pdm
+FROM python:3.12-slim AS pdm
 
 WORKDIR /app
 
@@ -58,7 +58,7 @@ COPY pyproject.toml pdm.lock ./
 # Install production dependencies only
 RUN pdm install --prod --no-lock --no-editable
 
-FROM python:3.9-slim
+FROM python:3.12-slim
 
 ARG TARGETARCH
 
@@ -82,7 +82,7 @@ COPY main.py /app/main.py
 COPY index.html /app/index.html
 
 # Set Python environment
-ENV PYTHONPATH=/app/.venv/lib/python3.9/site-packages
+ENV PYTHONPATH=/app/.venv/lib/python3.12/site-packages
 ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 ENV WXOCR_BASE_PATH=/app/wx/opt/wechat/wxocr

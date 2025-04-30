@@ -1,4 +1,4 @@
-FROM ubuntu:24.04 AS builder
+FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -37,7 +37,7 @@ RUN mkdir build && \
       -DPython_LIBRARY=/usr/lib/${LIB_ARCH}-linux-gnu/libpython3.12.so && \
     make pywcocr -j$(nproc)
 
-FROM ubuntu:24.04 AS extractor
+FROM ubuntu:22.04 AS extractor
 
 COPY ./wx.tar.gz /tmp/wx.tar.gz
 

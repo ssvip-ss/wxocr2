@@ -105,13 +105,76 @@ pdm run dev  # Builds and runs the container locally with hot-reload
 3. **API Response Format**
    ```json
    {
-     "code": 200,
-     "data": [
-       {
-         "text": "Extracted text content",
-         "position": [x1, y1, x2, y2]  // Text bounding box coordinates
-       }
-     ]
+    "imgpath": "/tmp/tmpb3xyldn1.png",
+    "errcode": 0,
+    "width": 640,
+    "height": 480,
+    "ocr_response": [
+        {
+            "text": "This is a lot of 12 point text to test the",
+            "left": 35.0,
+            "top": 89.0,
+            "right": 585.0,
+            "bottom": 118.0,
+            "rate": 0.9929679036140442
+        },
+        {
+            "text": "ocr code and see if it works on all types",
+            "left": 32.94903564453125,
+            "top": 123.83487701416016,
+            "right": 619.06640625,
+            "bottom": 154.24786376953125,
+            "rate": 0.956400990486145
+        },
+        {
+            "text": "of file format.",
+            "left": 35.0,
+            "top": 159.0,
+            "right": 231.0,
+            "bottom": 186.0,
+            "rate": 0.9963808655738831
+        },
+        {
+            "text": "The quick brown dog jumped over the",
+            "left": 35.9342041015625,
+            "top": 191.95358276367188,
+            "right": 586.061767578125,
+            "bottom": 222.08526611328125,
+            "rate": 0.9664455056190491
+        },
+        {
+            "text": "lazy fox. The quick brown dog jumped",
+            "left": 34.0,
+            "top": 226.0,
+            "right": 588.0,
+            "bottom": 257.0,
+            "rate": 0.9813371300697327
+        },
+        {
+            "text": "over the lazy fox. The quick brown dog",
+            "left": 33.0,
+            "top": 261.0,
+            "right": 597.0,
+            "bottom": 290.0,
+            "rate": 0.9844457507133484
+        },
+        {
+            "text": "jumped over the lazy fox. The quick",
+            "left": 39.9570198059082,
+            "top": 293.6304016113281,
+            "right": 565.0376586914062,
+            "bottom": 325.1492004394531,
+            "rate": 0.9845834970474243
+        },
+        {
+            "text": "brown dog jumped over the lazy fox.",
+            "left": 34.95534896850586,
+            "top": 328.567138671875,
+            "right": 560.039306640625,
+            "bottom": 358.50555419921875,
+            "rate": 0.9805647730827332
+        }
+    ]
    }
    ```
 

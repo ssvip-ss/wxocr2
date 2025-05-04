@@ -5,7 +5,7 @@
 [![Image](https://ghcr-badge.yuchanns.xyz/yuchanns/wxocr/tags?ignore=latest)](https://github.com/yuchanns/wxocr/pkgs/container/wxocr)
 ![Size](https://ghcr-badge.yuchanns.xyz/yuchanns/wxocr/size)
 
-A containerized WeChat OCR API service with multi-architecture support (x86_64 and ARM64). This project is forked from [hx71105417/wxocr](https://github.com/hx71105417/wxocr) with additional improvements for modern environments.
+A modern, high-performance OCR API service utilizing WeChat's OCR capabilities, containerized for easy deployment. This project enhances [hx71105417/wxocr](https://github.com/hx71105417/wxocr) with improved architecture support, performance optimizations, and modern development practices. It provides both RESTful API and web interface for convenient OCR text extraction from images.
 
 <details>
 <summary>WebUI Example</summary>
@@ -15,23 +15,35 @@ width="600"/>
 
 ## 🚀 Features
 
-- Multi-architecture support (AMD64 and ARM64)
-- Python 3.12 compatibility
-- Docker container ready
-- Simple REST API interface
-- Easy deployment
-- Simple web UI for testing
+- **Cross-Platform Support**: Runs natively on both AMD64 and ARM64 architectures
+- **Modern Stack**: Built with Python 3.12 and FastAPI for optimal performance
+- **Container-First**: Fully containerized with Docker for consistent deployment
+- **Developer-Friendly API**: 
+  - Clean REST API interface with JSON responses
+  - Support for both base64-encoded images and image URLs
+  - Built-in input validation and error handling
+- **Efficient Processing**: 
+  - Asynchronous connection handling with FastAPI
+  - Smart CPU detection and multiprocess architecture for OCR tasks
+  - Automatic resource management with semaphores
+  - Optimized for high throughput
+- **Interactive Testing**: Built-in web UI for quick API testing
+- **Health Monitoring**: Built-in health check endpoint
+- **Security Features**:
+  - Image validation for supported formats (PNG, JPG, JPEG)
+  - URL validation and secure image downloading
+  - Base64 data validation
 
 ## 📋 Prerequisites
 
-- Docker installed
-- Git && LFS (for cloning the repository)
-- Internet connection for pulling Docker images
+- Docker Engine (20.10.0 or later)
+- Git with LFS support (for repository cloning)
+- Internet access (for pulling container images)
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
-pdm run start ## build and run the container locally
+pdm run dev  # Builds and runs the container locally with hot-reload
 ```
 
 ## 🛠️ Installation
@@ -45,44 +57,68 @@ pdm run start ## build and run the container locally
 
 2. **Build the Docker Image**
    ```bash
-   # Enable multi-architecture support (required for ARM64 hosts)
+   # Setup multi-arch support
    docker run --privileged --rm tonistiigi/binfmt --install all
 
-   # Create and use multi-architecture builder
+   # Configure buildx builder
    docker buildx create --name multiarch --driver docker-container --use
 
-   # Build and push the image (replace the tag as needed)
+   # Build and push multi-arch image
    docker buildx build --platform linux/amd64,linux/arm64 \
-     -t ghcr.io/yuchanns/wxocr:duo-3.12 --push .
+     -t ghcr.io/yuchanns/wxocr:latest \
+     -t ghcr.io/yuchanns/wxocr:3.12 \
+     --push .
    ```
 
-## 🚀 Usage
+## 📖 Usage Guide
 
-1. **Start the Container**
+1. **Deploy Container**
    ```bash
-   docker run -d -p 5000:5000 ghcr.io/yuchanns/wxocr:duo-3.12
+   docker run -d -p 5000:5000 ghcr.io/yuchanns/wxocr:latest
    ```
 
-2. **Test the API**
-   ```bash
-   # Create a test request with a base64 encoded image
-   echo '{"image": "'$(base64 test_image.jpg)'"}' > data.json
+2. **API Endpoints**
 
-   # Send the request
-   curl -X POST \
-     -H "Content-Type: application/json" \
-     -d @data.json \
-     http://localhost:5000/ocr
+   - **Health Check**
+     ```bash
+     curl http://localhost:5000/health
+     ```
 
-    # Create a test request with a URL
-    echo '{"url": "https://example.com/test_image.jpg"}' > data.json
+   - **Web Interface**
+     ```
+     http://localhost:5000/
+     ```
 
-    # Send the request
-    curl -X POST \
-      -H "Content-Type: application/json" \
-      -d @data.json \
-      http://localhost:5000/ocr
+   - **OCR API**
+     ```bash
+     # OCR from Base64 encoded image
+     curl -X POST http://localhost:5000/ocr \
+       -H "Content-Type: application/json" \
+       -d '{"image": "'$(base64 test_image.jpg)'"}'
+
+     # OCR from Image URL
+     curl -X POST http://localhost:5000/ocr \
+       -H "Content-Type: application/json" \
+       -d '{"url": "https://example.com/test_image.jpg"}'
+     ```
+
+3. **API Response Format**
+   ```json
+   {
+     "code": 200,
+     "data": [
+       {
+         "text": "Extracted text content",
+         "position": [x1, y1, x2, y2]  // Text bounding box coordinates
+       }
+     ]
+   }
    ```
+
+4. **Environment Variables**
+   - `PORT`: API server port (default: 5000)
+   - `WXOCR_BASE_PATH`: Path to WXOCR base directory (default: /app/wx/opt/wechat/wxocr)
+   - `WECHAT_PATH`: Path to WeChat directory (default: /app/wx/opt/wechat)
 
 ## 🙏 Credits
 
@@ -92,9 +128,9 @@ This project builds upon the work of these excellent repositories:
 
 ## ⚠️ Legal Notice
 
-**Disclaimer:** This project is intended for educational and research purposes only. Commercial use is not recommended. Users assume full responsibility for any consequences arising from their use of this software.
+**Disclaimer:** This project is provided for educational and research purposes only. Commercial use is not advised. Users are solely responsible for ensuring their use complies with applicable laws and terms of service.
 
-**Copyright Notice:** This repository serves as a container for existing open-source projects. If you believe this repository infringes upon your intellectual property rights, please contact the repository owner immediately for prompt removal. We are committed to respecting intellectual property rights and will address any concerns expeditiously.
+**Copyright Notice:** This project builds upon and containerizes existing open-source software. If you believe your intellectual property rights have been infringed, please contact us for prompt resolution. We are committed to maintaining open-source compliance and addressing any concerns immediately.
 
 ## 📄 License
 

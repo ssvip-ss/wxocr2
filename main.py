@@ -1,50 +1,82 @@
-import os
 import base64
 import logging
-import tempfile
-import requests
+import os
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Optional, cast
+from typing import Optional
 from urllib.parse import urlparse
-from flask import Flask, request, jsonify, Response
-from flask.json.provider import DefaultJSONProvider
-from twisted.web.wsgi import WSGIResource
-from twisted.web.server import Site
-from twisted.internet import reactor, endpoints
-from twisted.internet.base import ReactorBase
-from werkzeug.middleware.proxy_fix import ProxyFix
-import wcocr  # type: ignore
+
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, ValidationError
+
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 # Application configuration
-WXOCR_BASE_PATH = os.getenv('WXOCR_BASE_PATH', '/app/wx/opt/wechat/wxocr')
-WECHAT_PATH = os.getenv('WECHAT_PATH', '/app/wx/opt/wechat')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+WXOCR_BASE_PATH = os.getenv("WXOCR_BASE_PATH", "/app/wx/opt/wechat/wxocr")
+WECHAT_PATH = os.getenv("WECHAT_PATH", "/app/wx/opt/wechat")
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
-app = Flask(__name__)
-provider = DefaultJSONProvider(app)
-provider.ensure_ascii = False
-app.json = provider
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
-# Initialize OCR
-try:
-    wcocr.init(WXOCR_BASE_PATH, WECHAT_PATH)
-    logger.info("Successfully initialized WXOCR")
-except Exception as e:
-    logger.error(f"Failed to initialize WXOCR: {e}")
-    raise
+async def get_cpu_limit():
+    from multiprocessing import cpu_count
+
+    import aiofiles
+    import aiopath
+
+    try:
+        if await aiopath.AsyncPath("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").exists():
+            async with aiofiles.open(
+                "/sys/fs/cgroup/cpu/cpu.cfs_quota_us", mode="r"
+            ) as fp:
+                cfs_quota_us = int((await fp.read()).strip())
+            if cfs_quota_us > 0:
+                async with aiofiles.open(
+                    "/sys/fs/cgroup/cpu/cpu.cfs_period_us", mode="r"
+                ) as fp:
+                    cfs_period_us = int((await fp.read()).strip())
+                if cfs_period_us > 0:
+                    return max(1, cfs_quota_us // cfs_period_us)
+        elif await aiopath.AsyncPath("/sys/fs/cgroup/cpu.max").exists():
+            async with aiofiles.open("/sys/fs/cgroup/cpu.max", mode="r") as fp:
+                content = (await fp.read()).strip().split()
+                if len(content) > 2 or content[0] != "max":
+                    quota = int(content[0])
+                    period = int(content[1])
+                    if quota > 0 and period > 0:
+                        return max(1, quota // period)
+    except Exception as e:
+        logger.warning(f"Error detecting container CPU limit: {e}")
+
+    return cpu_count()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    import asyncio
+
+    cpu = await get_cpu_limit()
+    workers = max(1, cpu - 1)
+    logger.info(f"Detected CPU limit: {cpu}, using {workers} workers")
+    app.state.semaphore = asyncio.Semaphore(workers)
+
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 def is_valid_url(url: str) -> bool:
     """Validate if the URL is legal"""
     try:
         result = urlparse(url)
-        return all([result.scheme in ['http', 'https'], result.netloc])
+        return all([result.scheme in ["http", "https"], result.netloc])
     except Exception:
         return False
 
@@ -59,13 +91,20 @@ def validate_base64(data: Optional[str]) -> bool:
         return False
 
 
-def download_image(url: str) -> Optional[bytes]:
+async def download_image(url: str) -> Optional[bytes]:
     """Download image from URL"""
     try:
-        response = requests.get(url, timeout=30)
-        content_type = response.headers.get('Content-Type', '').lower()
+        import httpx
 
-        if (response.status_code == 200 and content_type.startswith('image/') and content_type.split('/')[1] in ALLOWED_EXTENSIONS):
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=30)
+        content_type = response.headers.get("Content-Type", "").lower()
+
+        if (
+            response.status_code == 200
+            and content_type.startswith("image/")
+            and content_type.split("/")[1] in ALLOWED_EXTENSIONS
+        ):
             return response.content
         return None
     except Exception as e:
@@ -73,9 +112,9 @@ def download_image(url: str) -> Optional[bytes]:
         return None
 
 
-@app.route('/health')
-def health_check() -> Response:
-    return jsonify({'status': 'healthy', 'timestamp': datetime.now(timezone.utc).isoformat()})
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 # Custom exceptions
@@ -85,63 +124,87 @@ class OCRException(Exception):
         self.status_code = status_code
 
 
-@app.errorhandler(OCRException)
-def handle_ocr_exception(error: OCRException) -> Response:
-    response = jsonify({'error': str(error)})
-    response.status_code = error.status_code
-    return response
+@app.exception_handler(ValidationError)
+def handle_validation_exception(error: ValidationError):
+    logger.error(f"Validation error: {error}")
+    return JSONResponse(
+        {"error": "Invalid request format", "details": error.errors()},
+        status_code=422,
+    )
 
 
-@app.errorhandler(Exception)
-def handle_exception(error: Exception) -> Response:
+@app.exception_handler(OCRException)
+def handle_ocr_exception(error: OCRException):
+    return JSONResponse({"error": str(error)}, status_code=error.status_code)
+
+
+@app.exception_handler(Exception)
+def handle_exception(error: Exception):
     logger.error(f"Error processing request: {error}")
-    response = jsonify({'error': 'Internal server error'})
-    response.status_code = 500
-    return response
+    return JSONResponse({"error": "Internal server error"}, status_code=500)
 
 
-@app.route('/ocr', methods=['POST'])
-def ocr() -> Response:
+class OcrRequest(BaseModel):
+    image: Optional[str] = None
+    url: Optional[str] = None
+
+
+def wxocr(path: str):
+    import wcocr  # type: ignore
+
+    # Initialize OCR
+    try:
+        wcocr.init(WXOCR_BASE_PATH, WECHAT_PATH)
+        logger.info("Successfully initialized WXOCR")
+        return wcocr.ocr(path)
+    except Exception as e:
+        logger.error(f"Failed to initialize WXOCR: {e}")
+        raise
+
+
+@app.post("/ocr")
+async def ocr(req: OcrRequest):
     """OCR Image Recognition API
     Request body format: {"image": "base64 encoded image data"} or {"url": "image URL"}
     """
-    if not request.is_json:
-        raise OCRException('Content-Type must be application/json')
-
-    data = request.get_json()
-    if data is None:
-        raise OCRException('Invalid JSON data')
-
-    image_data = data.get('image')
-    image_url = data.get('url')
-
-    # Validate request parameters
-    if (not image_data and not image_url) or (image_data and image_url):
-        raise OCRException('Must provide either image data or URL, not both')
-
+    image_data = req.image
+    image_url = req.url
     # Prepare image data
     if image_url:
         if not is_valid_url(image_url):
-            raise OCRException('Invalid URL format')
-        image_bytes = download_image(image_url)
+            raise OCRException("Invalid URL format")
+        image_bytes = await download_image(image_url)
         if not image_bytes:
-            raise OCRException('Failed to download image')
-    else:
+            raise OCRException("Failed to download image")
+    elif image_data:
         if not validate_base64(image_data):
-            raise OCRException('Invalid base64 image data')
+            raise OCRException("Invalid base64 image data")
         image_bytes = base64.b64decode(image_data)
+    else:
+        raise OCRException("Must provide either image data or URL, not both")
 
     # Process image
-    with tempfile.NamedTemporaryFile(suffix='.png', delete=True) as temp:
-        temp.write(image_bytes)
-        temp.flush()
+    from aiofiles import tempfile
+
+    async with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as temp:
+        await temp.write(image_bytes)
+        await temp.flush()
 
         start_time = datetime.now()
-        result = wcocr.ocr(temp.name)
         processing_time = (datetime.now() - start_time).total_seconds()
+        import asyncio
 
-        logger.info(f"OCR completed in {processing_time:.2f}s")
-        return jsonify(result)
+        from concurrent.futures import ProcessPoolExecutor
+
+        async with app.state.semaphore:
+            x = ProcessPoolExecutor(max_workers=1)
+            try:
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(x, wxocr, str(temp.name))
+                logger.info(f"OCR completed in {processing_time:.2f}s")
+                return result
+            finally:
+                x.shutdown(wait=False)
 
 
 try:
@@ -151,30 +214,34 @@ except Exception as e:
     index_html = f"Error reading index.html: {e}"
 
 
-@app.route('/favicon.ico')
-def favicon() -> Response:
-    svg = '''<?xml version="1.0" encoding="UTF-8"?>
+@app.get("/favicon.ico")
+def favicon():
+    svg = """<?xml version="1.0" encoding="UTF-8"?>
 <svg width="32" height="32" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
     <circle cx="16" cy="16" r="16" fill="#07C160"/>
     <text x="16" y="22" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
           text-anchor="middle" fill="white">
         OCR
     </text>
-</svg>'''
+</svg>"""
 
-    return Response(svg, mimetype='image/svg+xml')
-
-
-@app.route('/')
-def index() -> Response:
-    return Response(index_html, mimetype='text/html')
+    return Response(svg, media_type="image/svg+xml")
 
 
-if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
-    typed_reactor = cast(ReactorBase, reactor)
-    resource = WSGIResource(typed_reactor, typed_reactor.getThreadPool(), app)
-    endpoint = endpoints.TCP4ServerEndpoint(typed_reactor, port, interface='0.0.0.0')
-    endpoint.listen(Site(resource))
-    logger.info(f"Starting server on port {port}")
-    typed_reactor.run()
+@app.get("/")
+def index():
+    return Response(index_html, media_type="text/html")
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run the FastAPI application")
+    parser.add_argument(
+        "--reload", action="store_true", help="Enable auto-reload for development"
+    )
+    args = parser.parse_args()
+    import uvicorn
+
+    port = int(os.getenv("PORT", 5000))
+    uvicorn.run("main:app", port=port, reload=args.reload, host="0.0.0.0")

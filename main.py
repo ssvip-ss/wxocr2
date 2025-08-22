@@ -175,6 +175,7 @@ def initializer():
                 child.terminate()
             except Exception:
                 pass
+        psutil.wait_procs(children, timeout=30)
 
     atexit.register(cleanup)
 

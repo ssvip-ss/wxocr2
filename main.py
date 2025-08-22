@@ -162,6 +162,23 @@ def wxocr(path: str):
         raise
 
 
+def initializer():
+    import atexit
+
+    import psutil
+
+    def cleanup():
+        parent = psutil.Process(os.getpid())
+        children = parent.children(recursive=True)
+        for child in children:
+            try:
+                child.terminate()
+            except Exception:
+                pass
+
+    atexit.register(cleanup)
+
+
 @app.post("/ocr")
 async def ocr(req: OcrRequest):
     """OCR Image Recognition API
@@ -197,14 +214,11 @@ async def ocr(req: OcrRequest):
         from concurrent.futures import ProcessPoolExecutor
 
         async with app.state.semaphore:
-            x = ProcessPoolExecutor(max_workers=1)
-            try:
+            with ProcessPoolExecutor(max_workers=1, initializer=initializer) as x:
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(x, wxocr, str(temp.name))
                 logger.info(f"OCR completed in {processing_time:.2f}s")
                 return result
-            finally:
-                x.shutdown(wait=False)
 
 
 try:

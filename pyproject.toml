@@ -12,6 +12,7 @@ dependencies = [
     "aiofiles>=24.1.0",
     "httpx>=0.28.1",
     "aiopath>=0.7.7",
+    "psutil>=7.0.0",
 ]
 requires-python = ">=3.12"
 
